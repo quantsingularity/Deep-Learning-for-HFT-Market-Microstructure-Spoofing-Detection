@@ -1,0 +1,50 @@
+# Configuration file for TEN-GNN model
+{
+  "model": {
+    "type": "TEN",
+    "input_dim": 47,
+    "d_model": 256,
+    "num_layers": 6,
+    "num_heads": 8,
+    "d_ff": 1024,
+    "dropout": 0.1,
+    "max_seq_len": 100
+  },
+  "training": {
+    "batch_size": 32,
+    "num_epochs": 50,
+    "learning_rate": 0.0001,
+    "weight_decay": 0.00001,
+    "optimizer": "AdamW",
+    "scheduler": "CosineAnnealingWarmRestarts",
+    "early_stopping_patience": 10,
+    "use_focal_loss": true,
+    "focal_loss_alpha": 0.25,
+    "focal_loss_gamma": 2.0
+  },
+  "data": {
+    "window_size": 100,
+    "num_levels": 10,
+    "spoofing_ratio": 0.5,
+    "train_split": 0.7,
+    "val_split": 0.15,
+    "test_split": 0.15
+  },
+  "labeling": {
+    "tau1": 0.85,
+    "tau2_min": 200,
+    "tau2_max": 800,
+    "tau3": 1.2
+  },
+  "gnn": {
+    "num_assets": 5,
+    "gnn_hidden_dim": 128,
+    "num_gnn_layers": 2,
+    "hawkes_beta": 1.0
+  },
+  "deployment": {
+    "device": "cuda",
+    "inference_batch_size": 1,
+    "max_latency_ms": 5.0
+  }
+}
