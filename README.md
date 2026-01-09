@@ -8,8 +8,7 @@
 
 This repository contains a complete implementation of the **Transformer-Encoder Network (TEN)** and **TEN-GNN hybrid model** for detecting algorithmic spoofing in high-frequency trading environments. The implementation is based on the research paper:
 
-**"High-Frequency Market Microstructure Analysis using Transformer-Encoder Networks (TEN) and Graph Neural Networks (GNN) for Detecting Algorithmic Spoofing"**  
-_Abrar Ahmed, January 2026_
+**"High-Frequency Market Microstructure Analysis using Transformer-Encoder Networks (TEN) and Graph Neural Networks (GNN) for Detecting Algorithmic Spoofing"**
 
 ### Key Features
 
