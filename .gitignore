@@ -1,4 +1,6 @@
-
+# ===============================================================
+# .gitignore
+# ===============================================================
 # General
 *.log
 *.tmp
@@ -83,6 +85,3 @@ celerybeat-schedule.*
 *.pyc
 *.whl
 *.egg
-
-# Specific project files
-git-auto-commit.sh

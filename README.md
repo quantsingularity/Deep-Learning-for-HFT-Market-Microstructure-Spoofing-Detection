@@ -2,7 +2,6 @@
 
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-red.svg)](https://pytorch.org/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 ## Overview
 
@@ -55,8 +54,8 @@ For multi-asset coordinated spoofing detection:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/ten-gnn-spoofing.git
-cd ten-gnn-spoofing
+git clone https://github.com/quantsingularity/Deep-Learning-for-HFT-Market-Microstructure-Spoofing-Detection
+cd Deep-Learning-for-HFT-Market-Microstructure-Spoofing-Detection
 
 # Create virtual environment
 python -m venv venv
