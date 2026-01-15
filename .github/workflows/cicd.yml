@@ -1,0 +1,121 @@
+name: CI Formatting Check
+
+on:
+  push:
+    branches: ["main", "develop"]
+  pull_request:
+    branches: ["main", "develop"]
+  workflow_dispatch:
+
+jobs:
+  formatting_check:
+    runs-on: ubuntu-latest
+    steps:
+      # -------------------------------
+      # Checkout repository
+      # -------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # -------------------------------
+      # Python Setup + Caching
+      # -------------------------------
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install Python formatters
+        run: |
+          python -m pip install --upgrade pip
+          pip install autoflake black
+
+      # -------------------------------
+      # Run Python formatting checks (repo-wide .py files)
+      # -------------------------------
+      - name: Run autoflake across repo (check only)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "=== Preparing temporary copy of repository for autoflake ==="
+          TMP_COPY="$(mktemp -d)"
+          # copy repo excluding .git and node_modules to avoid noise
+          rsync -a --exclude='.git' --exclude='node_modules' --exclude='.venv' ./ "$TMP_COPY/"
+
+          echo "=== Running autoflake (will modify temp copy) on all .py files ==="
+          # Use find to target only .py files
+          find "$TMP_COPY" -type f -name "*.py" -print0 | xargs -0 --no-run-if-empty autoflake \
+            --remove-all-unused-imports \
+            --remove-unused-variables \
+            --recursive \
+            --ignore-init-module-imports \
+            --in-place
+
+          echo "=== Comparing repo with autoflake-modified copy ==="
+          if ! diff -r . "$TMP_COPY" > /dev/null; then
+            echo "autoflake detected unused imports / formatting changes in .py files."
+            echo "Run locally: autoflake --remove-all-unused-imports --remove-unused-variables --recursive --ignore-init-module-imports --in-place <path>"
+            rm -rf "$TMP_COPY"
+            exit 1
+          fi
+
+          rm -rf "$TMP_COPY"
+          echo "autoflake check passed (no changes)."
+
+      - name: Run black check (repo-wide)
+        run: |
+          # Black will check all python files in the repo
+          black . --check
+
+      # -------------------------------
+      # Node + npm caching (for Prettier)
+      # -------------------------------
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+
+      - name: Install Node dependencies (root)
+        working-directory: .
+        run: |
+          npm ci
+
+      # -------------------------------
+      # Prettier checks
+      # -------------------------------
+      - name: Run Prettier Checks (all .md files in repo)
+        working-directory: .
+        run: |
+          echo "=== Running Prettier (all .md files) ==="
+          # Check all markdown files in repo, honoring .prettierignore if present
+          npx --no-install prettier --check "**/*.md" --ignore-path .prettierignore || {
+            echo "Prettier formatting issues detected in markdown files across the repo."
+            exit 1
+          }
+
+      - name: Run Prettier Checks (all .yml/.yaml files in repo)
+        working-directory: .
+        run: |
+          echo "=== Running Prettier (all .yml/.yaml files) ==="
+          npx --no-install prettier --check "**/*.{yml,yaml}" --ignore-path .prettierignore || {
+            echo "Prettier formatting issues detected in YAML/YML files across the repo."
+            exit 1
+          }
+
+      # -------------------------------
+      # Finalize
+      # -------------------------------
+      - name: Finalize Check
+        run: echo "All formatting checks for .py, .md and .yml/.yaml files completed successfully."
