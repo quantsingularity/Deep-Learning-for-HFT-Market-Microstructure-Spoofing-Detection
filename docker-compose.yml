@@ -1,0 +1,272 @@
+version: "3.8"
+
+services:
+  # ============================================
+  # Zookeeper (for Kafka)
+  # ============================================
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: ten-gnn-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - ten-gnn-network
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================
+  # Kafka (Message Broker)
+  # ============================================
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: ten-gnn-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    networks:
+      - ten-gnn-network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "kafka-broker-api-versions",
+          "--bootstrap-server",
+          "localhost:9092",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  # ============================================
+  # Redis (Caching & Rate Limiting)
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: ten-gnn-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - ten-gnn-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ============================================
+  # PostgreSQL (Alert Storage)
+  # ============================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: ten-gnn-postgres
+    environment:
+      POSTGRES_DB: spoofing_detection
+      POSTGRES_USER: tengnn
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme123}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./deployment/monitoring/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - ten-gnn-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tengnn"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================
+  # TEN-GNN CPU Inference Service
+  # ============================================
+  ten-gnn-cpu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: cpu
+    container_name: ten-gnn-cpu
+    image: ten-gnn:cpu-latest
+    ports:
+      - "8000:8000"
+    environment:
+      - DEVICE=cpu
+      - MODEL_PATH=/app/pretrained_models/ten_model_synthetic.pth
+      - CONFIG_PATH=/app/configs/config.json
+      - REDIS_HOST=redis
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=spoofing_detection
+      - POSTGRES_USER=tengnn
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme123}
+    volumes:
+      - ./pretrained_models:/app/pretrained_models:ro
+      - ./logs:/app/logs
+      - ./data:/app/data
+      - ./alerts:/app/alerts
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - ten-gnn-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    profiles:
+      - cpu
+
+  # ============================================
+  # TEN-GNN GPU Inference Service
+  # ============================================
+  ten-gnn-gpu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: gpu-base
+    container_name: ten-gnn-gpu
+    image: ten-gnn:gpu-latest
+    ports:
+      - "8001:8000"
+    environment:
+      - DEVICE=cuda
+      - MODEL_PATH=/app/pretrained_models/ten_model_synthetic.pth
+      - CONFIG_PATH=/app/configs/config.json
+      - REDIS_HOST=redis
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=spoofing_detection
+      - POSTGRES_USER=tengnn
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme123}
+      - CUDA_VISIBLE_DEVICES=0
+    volumes:
+      - ./pretrained_models:/app/pretrained_models:ro
+      - ./logs:/app/logs
+      - ./data:/app/data
+      - ./alerts:/app/alerts
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - ten-gnn-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    profiles:
+      - gpu
+
+  # ============================================
+  # Streaming Consumer
+  # ============================================
+  streaming-consumer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: cpu
+    container_name: ten-gnn-consumer
+    command: python deployment/streaming/kafka_consumer.py
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_TOPIC=lob_events
+      - REDIS_HOST=redis
+      - API_URL=http://ten-gnn-cpu:8000
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ten-gnn-network
+    restart: unless-stopped
+    profiles:
+      - streaming
+
+  # ============================================
+  # Prometheus (Metrics)
+  # ============================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: ten-gnn-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./deployment/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    networks:
+      - ten-gnn-network
+    profiles:
+      - monitoring
+
+  # ============================================
+  # Grafana (Visualization)
+  # ============================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: ten-gnn-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./deployment/monitoring/grafana-dashboards:/etc/grafana/provisioning/dashboards
+    depends_on:
+      - prometheus
+    networks:
+      - ten-gnn-network
+    profiles:
+      - monitoring
+
+networks:
+  ten-gnn-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+  postgres-data:
+  prometheus-data:
+  grafana-data:
