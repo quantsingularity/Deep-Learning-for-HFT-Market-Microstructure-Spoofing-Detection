@@ -1,4 +1,4 @@
-# Deep Learning for HFT Market Microstructure Spoofing Detection: TEN-GNN Hybrid
+# Deep Learning for HFT Market Microstructure Spoofing Detections
 
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](requirements.txt)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-red.svg)](requirements.txt)
