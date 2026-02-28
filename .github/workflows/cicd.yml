@@ -88,9 +88,9 @@ jobs:
         with:
           node-version: "18"
 
-      # -------------------------------
+      # ----------------------------------
       # Prettier checks (Markdown & YAML)
-      # -------------------------------
+      # ----------------------------------
       - name: Run Prettier Checks (all .md files in repo)
         run: |
           echo "=== Running Prettier (all .md files) ==="
