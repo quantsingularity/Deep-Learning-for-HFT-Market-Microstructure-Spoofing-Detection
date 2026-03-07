@@ -7,7 +7,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-Production-green.svg)](deployment/api/server.py)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A production-ready framework for detecting algorithmic spoofing in HFT environments using a **TEN-GNN Hybrid Model** — combining a Transformer-Encoder Network for temporal asset modeling with a Graph Neural Network for coordinated multi-asset manipulation detection. Designed for real-time market surveillance and regulatory compliance (MiFID II, MAR).
+A production-ready framework for detecting algorithmic spoofing in HFT environments using a **TEN-GNN Hybrid Model** combining a Transformer-Encoder Network for temporal asset modeling with a Graph Neural Network for coordinated multi-asset manipulation detection. Designed for real-time market surveillance and regulatory compliance (MiFID II, MAR).
 
 ---
 
@@ -48,19 +48,6 @@ A production-ready framework for detecting algorithmic spoofing in HFT environme
 | **Adaptive Positional Encoding**  | Encodes irregular inter-event time intervals                      | `code/models/transformer_encoder.py`            |
 | **Hawkes Process Estimation**     | Computes directional causality matrix between assets              | `code/models/hawkes_gnn.py`                     |
 | **Graph Attention Network (GAT)** | Aggregates cross-asset signals for coordinated spoofing detection | 2 GNN layers, 128 hidden dims                   |
-
-### Production Stack
-
-```mermaid
-graph TD
-    A["Data Source (FIX/ITCH)"] --> B(Kafka Stream)
-    B --> C(Streaming Consumer)
-    C --> D("FastAPI: TEN-GNN Inference")
-    D --> E(Redis Cache)
-    D --> F("PostgreSQL: Alert Storage")
-    D --> G(Prometheus Metrics)
-    G --> H(Grafana Dashboard)
-```
 
 ---
 
